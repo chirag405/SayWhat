@@ -377,7 +377,6 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
 
     return () => disposer();
   },
-
   subscribeToScenarios: (turnId) => {
     const supabase = createClient();
     const subscription = supabase
@@ -391,9 +390,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
           filter: `turn_id=eq.${turnId}`,
         },
         (payload) => {
-          if (payload.eventType === "INSERT") {
-            set({ currentScenario: payload.new as Scenario });
-          }
+          // Don't automatically set currentScenario when scenarios are just inserted
+          // Only set it when a scenario is actually selected (handled by turn subscription)
+          console.log("Scenario change detected:", payload.eventType);
         }
       )
       .subscribe();
@@ -602,20 +601,22 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
         });
     }
   },
-
   generateScenarios: async (turnId) => {
     const scenarios = await actions.generateScenarios(turnId);
-    if (scenarios?.length) set({ currentScenario: scenarios[0] });
+    // Don't automatically set currentScenario when generating scenarios
+    // Only set it when a scenario is actually selected
     return scenarios || [];
   },
-
   selectScenario: async (turnId, scenario, context, userId) => {
     await actions.selectScenario(turnId, scenario, context, userId);
 
-    // If we selected a scenario by ID, update our current scenario
+    // After successful selection, fetch and set the current scenario
     if (scenario.id) {
       const scenarioData = await get().getScenarioById(scenario.id);
       set({ currentScenario: scenarioData });
+    } else if (scenario.customText) {
+      // For custom scenarios, we need to fetch the newly created scenario
+      // This will be handled by the turn subscription when scenario_id is set
     }
   },
 
